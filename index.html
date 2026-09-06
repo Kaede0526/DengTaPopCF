@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>穿越火线 · 主奖池 道具抽奖模拟器</title>
+<style>
+  :root{
+    --bg0:#070a13;--bg1:#0c1220;--panel:#111a2e;--panel2:#0e1626;
+    --line:#22314f;--line2:#2c3d60;--txt:#dfe7f5;--muted:#8b9bc0;
+    --gold:#ffc83d;--gold2:#ff9f1c;--cyan:#4fd9ff;--green:#7ee2a8;--red:#ff8f8f;
+    --r-legend:#ffb62e;--r-epic:#c07dff;--r-rare:#59b9ff;--r-common:#aab8d6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg0);color:var(--txt);
+    font-family:"Microsoft YaHei","PingFang SC","Hiragino Sans GB",Arial,sans-serif;
+    min-height:100vh;letter-spacing:.2px;}
+  /* ---- full-page background layer (behind .wrap) ---- */
+  .bg-fx{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+  .bg-img{position:absolute;inset:-8%;
+    background:url('assets/bg.jpg') center center / cover no-repeat;
+    animation:kenburns 46s ease-in-out infinite alternate;will-change:transform}
+  @keyframes kenburns{0%{transform:scale(1) translate(0,0)}100%{transform:scale(1.14) translate(-1.6%,1.4%)}}
+  .bg-veil{position:absolute;inset:0;
+    background:
+      radial-gradient(120% 90% at 50% 0%,rgba(9,12,22,.36),rgba(7,10,19,.8) 78%),
+      linear-gradient(180deg,rgba(8,11,20,.5),rgba(8,11,20,.7) 40%,rgba(5,8,16,.92));
+    backdrop-filter:saturate(.92) blur(.5px)}
+  .bg-vig{position:absolute;inset:0;
+    box-shadow:inset 0 0 220px 60px rgba(0,0,0,.55);
+    background:radial-gradient(140% 100% at 50% 45%,transparent 55%,rgba(0,0,0,.4) 100%)}
+  .bg-fx .spark{position:absolute;width:3px;height:3px;border-radius:50%;
+    background:radial-gradient(circle,#ffe9b0,#ffb62e 60%,transparent);opacity:0;
+    animation:floaty linear infinite}
+  @keyframes floaty{0%{transform:translateY(0);opacity:0}10%{opacity:.7}100%{transform:translateY(-110vh);opacity:0}}
+  body.bg-static .bg-img{animation:none;transform:none}
+  body.bg-static .bg-fx .spark{display:none}
+  body.bg-static .bg-veil{transition:.3s}
+  .bgtoggle{position:fixed;left:14px;bottom:16px;z-index:60;cursor:pointer;user-select:none;
+    display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);
+    background:rgba(13,21,38,.75);border:1px solid var(--line2);border-radius:999px;padding:7px 14px;
+    backdrop-filter:blur(6px);font-family:inherit}
+  .bgtoggle:hover{color:#fff;border-color:#3a4f78}
+  .bgtoggle .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+  .bgtoggle.off .dot{background:var(--muted);box-shadow:none}
+  .wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:18px 16px 80px}
+  header.hero{display:flex;align-items:center;gap:14px;padding:16px 0 10px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .hero .brand{font-size:26px;font-weight:800;letter-spacing:1px;
+    background:linear-gradient(180deg,#fff,#ffd97a 60%,#ff9f1c);-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 2px 6px rgba(255,180,40,.25))}
+  .hero .sub{margin-left:auto;color:var(--muted);font-size:13px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+  .stat{background:linear-gradient(180deg,rgba(17,26,46,.7),rgba(14,22,38,.84));backdrop-filter:blur(6px);border:1px solid var(--line);border-radius:12px;padding:13px 15px;position:relative;overflow:hidden}
+  .stat::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--gold),transparent)}
+  .stat .k{color:var(--muted);font-size:12px;margin-bottom:5px}
+  .stat .v{font-size:23px;font-weight:800;color:var(--gold);font-variant-numeric:tabular-nums}
+  .stat.c .v{color:var(--cyan)} .stat.l .v{color:var(--r-legend)} .stat.t .v{color:#9ff1c8}
+  .stat.g .v{color:var(--green)} .stat.q .v{color:#8fd3ff}
+  section{background:linear-gradient(180deg,rgba(17,26,46,.72),rgba(14,22,38,.84));
+    backdrop-filter:blur(7px);border:1px solid var(--line);border-radius:14px;padding:18px;margin:16px 0}
+  h2.sec{font-size:17px;color:#fff;display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  h2.sec i{width:4px;height:18px;background:linear-gradient(180deg,var(--gold),var(--gold2));border-radius:2px;display:inline-block}
+  h2.sec small{color:var(--muted);font-weight:400;font-size:12px;margin-left:4px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .flex{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .btn{cursor:pointer;border:1px solid var(--line2);background:linear-gradient(180deg,#1b2843,#111a2e);color:var(--txt);border-radius:10px;padding:11px 20px;font-size:14px;font-weight:700;transition:.15s;user-select:none;font-family:inherit}
+  .btn:hover{border-color:#3a4f78;transform:translateY(-1px)} .btn:active{transform:translateY(0)}
+  .btn.primary{background:linear-gradient(180deg,#ffcf4d,#f59a14);color:#241303;border:none;box-shadow:0 4px 16px rgba(255,160,20,.28)}
+  .btn.primary:hover{filter:brightness(1.06)}
+  .btn.primary:disabled{opacity:.4;cursor:not-allowed;filter:none}
+  .btn.gold{border-color:#6a5218;color:var(--gold)}
+  .btn.red{border-color:#6a2a2a;color:var(--red)}
+  .btn.ghost{background:transparent;border-color:var(--line2);color:var(--muted)}
+  .btn.mini{padding:5px 12px;font-size:12px;border-radius:7px}
+  .btn.big{padding:15px 34px;font-size:17px;letter-spacing:2px}
+  .chip{border:1px solid var(--line2);border-radius:8px;padding:7px 11px;font-size:12px;color:var(--muted)}
+  .chip b{font-size:14px}
+  .stage{position:relative;border:1px solid var(--line2);border-radius:12px;padding:18px;
+    background:radial-gradient(500px 260px at 50% 0%,rgba(80,120,255,.10),transparent 70%),linear-gradient(180deg,#0d1526,#0a101d);margin-top:6px}
+  .stage .hint{position:absolute;top:10px;right:14px;color:var(--muted);font-size:12px}
+  .prize-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+  @media(max-width:640px){.prize-grid{grid-template-columns:repeat(2,1fr)}}
+  .cell{border:1px solid var(--line);background:#0e1728;border-radius:10px;padding:11px 8px;text-align:center;min-height:92px;display:flex;flex-direction:column;justify-content:center;position:relative}
+  .cell .rname{font-size:13px;line-height:1.35;color:#eef3fb}
+  .cell .pp{font-size:11px;color:var(--muted);margin-top:6px}
+  .cell.rar{background:radial-gradient(circle at 50% 0%,rgba(255,150,20,.14),transparent 70%),#0e1728;border-color:#5a3a12}
+  .cell.glow{outline:2px solid var(--gold);box-shadow:0 0 18px rgba(255,190,50,.45);transform:scale(1.04);z-index:2}
+  .cell .tag{position:absolute;top:6px;right:6px;font-size:10px;color:#ffd48a}
+  .cell .ph{height:62px;display:flex;align-items:center;justify-content:center;margin-bottom:5px}
+  .cell .ph img{max-height:60px;max-width:74px;object-fit:contain;filter:drop-shadow(0 3px 7px rgba(0,0,0,.55))}
+  .ctl{display:flex;gap:14px;justify-content:center;margin-top:18px;flex-wrap:wrap}
+  .tier-legend{color:var(--r-legend);text-shadow:0 0 10px rgba(255,180,50,.5)}
+  .tier-epic{color:var(--r-epic)} .tier-rare{color:var(--r-rare)} .tier-common{color:var(--r-common)}
+  .packs{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+  .pack{border:1px solid var(--line2);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;background:#0d1526}
+  .pack .pr{font-size:24px;font-weight:800;color:var(--gold)}
+  .pack .pr small{font-size:12px;color:var(--muted);font-weight:400}
+  .pack .gd{color:var(--muted);font-size:13px;line-height:1.7}
+  .pack .gd b{color:#fff;font-size:15px}
+  .pack .eff{color:var(--green);font-size:12px;background:rgba(126,226,168,.08);border:1px solid rgba(126,226,168,.25);border-radius:6px;padding:4px 8px;align-self:flex-start}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:9px 10px;text-align:left;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;background:rgba(255,255,255,.02)}
+  td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+  td.ctr,th.ctr{text-align:center}
+  tr:hover td{background:rgba(255,255,255,.02)}
+  .bar{display:inline-block;height:8px;border-radius:4px;vertical-align:middle;margin-left:8px}
+  .dh-bal{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;background:#0d1526;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .dh-bal .val{font-size:20px;font-weight:800;color:var(--gold)}
+  .dh-row{display:flex;gap:12px;flex-wrap:wrap;align-items:stretch}
+  .dh-cell{flex:1 1 200px;border:1px solid var(--line);background:#0e1728;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+  .dh-name{font-size:14px;font-weight:700;color:#fff;line-height:1.35;min-height:38px}
+  .dh-pic{height:58px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 50%,rgba(80,120,255,.10),transparent 75%)}
+  .dh-pic img{max-height:56px;max-width:130px;object-fit:contain;filter:drop-shadow(0 3px 7px rgba(0,0,0,.5))}
+  .dh-cost{color:var(--gold);font-size:13px;margin-bottom:4px}
+  .dh-cost b{font-size:16px}
+  .empty{color:var(--muted);padding:16px;text-align:center;border:1px dashed var(--line2);border-radius:10px}
+  .overlay{position:fixed;inset:0;background:rgba(3,6,12,.84);backdrop-filter:blur(2px);display:none;
+    z-index:100;padding:12px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .overlay.open{display:flex}
+  .modal{max-width:580px;width:100%;max-height:calc(100vh - 24px);margin:auto;
+    display:flex;flex-direction:column;
+    background:linear-gradient(180deg,#16223c,#0e1728);border:1px solid var(--line2);border-radius:16px;
+    overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+  .modal .mhead{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:13px 18px;background:rgba(255,255,255,.03);border-bottom:1px solid var(--line)}
+  .modal .mhead h3{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;font-size:16px;color:#fff;padding-right:14px}
+  .modal .mbody{padding:20px 18px;text-align:center;flex:1 1 auto;min-height:0;
+    overflow-y:auto;-webkit-overflow-scrolling:touch}
+  /* bottom close + safe-area: never hidden by browser bars/notch */
+  .overlay{padding-top:max(12px,env(safe-area-inset-top));padding-bottom:max(16px,env(safe-area-inset-bottom));
+    padding-left:12px;padding-right:12px}
+  .modal .mhead{padding-top:max(12px,env(safe-area-inset-top))}
+  .modal .mfoot{flex:0 0 auto;display:flex;border-top:1px solid var(--line);
+    padding:10px 12px max(12px,env(safe-area-inset-bottom));background:rgba(0,0,0,.14)}
+  .modal .mfoot .mclose{flex:1 1 auto;width:100%;min-height:46px;padding:12px;font-size:16px;letter-spacing:4px;border-radius:10px}
+  .modal .x{cursor:pointer;color:var(--muted);font-size:22px;line-height:1;padding:4px}
+  .modal .x:hover{color:#fff}
+  .result-badge{display:inline-block;font-size:12px;padding:4px 12px;border-radius:20px;margin-bottom:14px;border:1px solid var(--line2);color:var(--muted)}
+  .result-badge.t{color:var(--r-legend);border-color:rgba(255,170,40,.5);background:rgba(255,160,20,.08)}
+  .result-name{font-size:29px;font-weight:800;line-height:1.3;margin:8px 0 6px}
+  .result-img{height:158px;display:flex;align-items:center;justify-content:center;margin:2px 0 2px}
+  .result-img img{max-height:158px;max-width:280px;object-fit:contain;filter:drop-shadow(0 10px 26px rgba(255,180,40,.32))}
+  .result-p{color:var(--muted);font-size:13px}
+  .confetti{font-size:13px;color:var(--gold);letter-spacing:2px;margin-top:12px}
+  .tenlist{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px;text-align:left}
+  @media(max-width:640px){.tenlist{grid-template-columns:1fr}}
+  .tenrow{display:flex;justify-content:space-between;background:#0d1526;border:1px solid var(--line);border-radius:8px;padding:9px 12px;align-items:center;gap:8px}
+  .tenrow .nm{font-size:13px;flex:1;min-width:0}
+  .tenrow .nms{font-size:12px;color:var(--muted);white-space:nowrap}
+  .tenrow .timg{height:42px;width:auto;object-fit:contain;margin-right:6px;align-self:center;filter:drop-shadow(0 2px 5px rgba(0,0,0,.5))}
+  .scrollbox{max-height:230px;overflow:auto;font-size:13px}
+  .li{padding:6px 4px;border-bottom:1px dashed var(--line);display:flex;justify-content:space-between;gap:10px}
+  .li .tm{color:var(--muted);white-space:nowrap;font-size:12px}
+  .inp{background:#0a1120;border:1px solid var(--line2);border-radius:8px;color:var(--txt);padding:9px 12px;font-size:14px;font-family:inherit}
+  .inp:focus{outline:none;border-color:var(--gold)}
+  #toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:rgba(14,22,38,.96);border:1px solid var(--line2);border-left:3px solid var(--gold);color:var(--txt);padding:12px 20px;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.5);z-index:200;opacity:0;pointer-events:none;transition:.25s;max-width:88vw}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.err{border-left-color:var(--red)} #toast.ok{border-left-color:var(--green)}
+  .ok{color:#7ee2a8}.bad{color:#ff8f8f}.eq{color:#f2c46e}
+  .note{color:var(--muted);font-size:12px;margin-top:8px}
+  .probm{display:inline-block;vertical-align:middle;margin-right:8px;height:36px}
+  .probm img{height:36px;width:auto;object-fit:contain;vertical-align:middle}
+  .footnote{color:var(--muted);font-size:12px;margin-top:12px;line-height:1.7}
+  code{background:#0d1526;border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--cyan)}
+  .hidden{display:none!important}
+  td,.cell .rname,.result-name,.dh-name,.tenrow .nm{overflow-wrap:anywhere;word-break:break-word}
+  /* ---- 移动端适配 ---- */
+  @media (max-width:760px){
+    .wrap{padding:12px 12px 160px}
+    header.hero{gap:8px 10px;padding:12px 0 8px}
+    .hero .brand{font-size:21px}
+    .hero .sub{margin-left:0;order:3;width:100%;text-align:right;font-size:12px}
+    section{padding:13px 12px;margin:12px 0;border-radius:12px}
+    h2.sec{font-size:15px;flex-wrap:wrap;row-gap:2px}
+    h2.sec small{display:block;margin-left:0}
+    .stat{padding:10px 12px}
+    .stat .v{font-size:20px}
+    .packs{grid-template-columns:1fr}
+    .stage{overflow:hidden}
+    .stage .hint{position:static;text-align:right;margin-bottom:8px}
+    .ctl{flex-direction:column;align-items:stretch;gap:9px}
+    .ctl .btn{width:100%;padding:14px 12px;font-size:16px;letter-spacing:1px}
+    .btn.big{padding:15px 12px;letter-spacing:1px}
+    .dh-bal{gap:8px;padding:10px 12px}
+    .dh-row{gap:10px}
+    .dh-cell{flex:1 1 100%}
+    #manageRow .flex{gap:8px}
+    #manageRow .inp{min-width:0;width:100%!important;flex:1 1 auto}
+    #inName{min-width:0!important;flex-basis:100%}
+    .overlay{padding-left:8px;padding-right:8px;padding-top:max(8px,env(safe-area-inset-top));padding-bottom:max(8px,env(safe-area-inset-bottom))}
+    .modal .mbody{padding:15px 12px}
+    .result-img{height:112px}
+    .result-img img{max-height:112px}
+    .result-name{font-size:22px}
+    .tenrow{padding:8px 9px}
+    .probm{height:28px;margin-right:6px}
+    .probm img{height:28px}
+    th,td{padding:7px 6px}
+    .bar{display:block;margin-left:0;margin-top:4px;width:60px!important}
+    .bgtoggle{left:10px;bottom:12px;font-size:11px;padding:6px 12px;z-index:70}
+    #toast{max-width:92vw;bottom:18px}
+  }
+  @media (max-width:480px){
+    .stats{grid-template-columns:repeat(2,1fr);gap:9px}
+    .btn.gold,.btn.red{width:100%;justify-content:center}
+    .flex[style*="margin-left:auto"]{margin-left:0!important;width:100%}
+  }
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-thumb{background:#22314f;border-radius:6px}
+  ::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+<div class="bg-fx" id="bgfx"><div class="bg-img"></div><div class="bg-vig"></div><div class="bg-veil"></div></div>
+<div class="wrap">
+  <header class="hero">
+    <div class="brand">穿越火线 · 主奖池</div>
+    <div style="color:var(--muted);font-size:13px">抽奖 + 欢乐值兑换模拟器（离线 · 本地加权随机）</div>
+    <div class="sub">欢乐混战 · <b>欢乐值</b>主奖池&nbsp;|&nbsp;参考 daoju.qq.com 概率公示</div>
+  </header>
+
+  <!-- ============ STATS ============ -->
+  <div class="stats">
+    <div class="stat t"><div class="k">累计抽奖</div><div class="v" style="font-size:19px" id="stTotal">0</div></div>
+    <div class="stat"><div class="k">欢乐值</div><div class="v" id="stJoy">0</div></div>
+    <div class="stat q"><div class="k">Q币余额</div><div class="v" id="stQb">200</div></div>
+    <div class="stat"><div class="k">复活币</div><div class="v" id="stFhb">0</div></div>
+    <div class="stat c"><div class="k">抽奖钥匙</div><div class="v" id="stKey">10</div></div>
+    <div class="stat l"><div class="k">传说/史诗出货</div><div class="v" style="font-size:19px" id="stRare">0</div></div>
+  </div>
+
+  <!-- ============ 商城 / 买钥匙 ============ -->
+  <section>
+    <h2 class="sec"><i></i>购买复活币 · 赠抽奖钥匙 <small>活动规则原价（钥匙价格见下方）</small></h2>
+    <div class="packs" id="packs"></div>
+    <div class="row" style="margin-top:14px">
+      <div class="flex" style="margin-left:auto">
+        <button class="btn gold" id="bRecharge">＋100 Q币（模拟充值）</button>
+        <button class="btn red" id="bReset">重置全部数据</button>
+      </div>
+    </div>
+    <div class="note">🔑 钥匙价格：<b style="color:var(--gold)">10Q币＝钥匙×1</b>（10 Q币/把）｜<b style="color:var(--gold)">100Q币＝钥匙×11</b>（约 9.1 Q币/把）｜<b style="color:var(--gold)">500Q币＝钥匙×55</b>（约 9.1 Q币/把）。每抽消耗 1 把钥匙；复活币可无限叠加。</div>
+  </section>
+
+  <!-- ============ 兑换区 ============ -->
+  <section>
+    <h2 class="sec"><i></i>兑换区 <small>消耗欢乐值换道具（示例表，可增删改）</small></h2>
+    <div class="dh-bal">
+      <span style="color:var(--muted)">可用欢乐值</span>
+      <span class="val" id="dhJoy">0</span>
+      <span style="margin-left:auto"><button class="btn mini gold" id="bManage">＋ 管理兑换项</button></span>
+    </div>
+    <div class="hidden" id="manageRow" style="background:#0d1526;border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px">
+      <div class="flex">
+        <input class="inp" id="inName" placeholder="道具名称" style="flex:1;min-width:150px">
+        <input class="inp" id="inCost" type="number" min="1" placeholder="欢乐值" style="width:120px">
+        <button class="btn primary" id="bAddOffer">＋ 添加</button>
+      </div>
+      <div class="note" style="margin-top:8px">每个兑换项在点击「兑换」时消耗对应欢乐值并发放到模拟仓库。例表为占位，可改成官方/你的准确数值；删除按钮在管理模式下显示。</div>
+    </div>
+    <div class="dh-row" id="dhList"></div>
+    <div class="empty hidden" id="dhEmpty">暂无兑换项，点「＋ 管理兑换项」添加。</div>
+
+    <h2 class="sec" style="margin-top:18px"><i></i>兑换记录 <small id="dhHistCount">0 条</small></h2>
+    <div class="scrollbox" id="dhHistBox"><div class="note">兑换成功后会记录在这里。</div></div>
+  </section>
+
+  <!-- ============ 主奖池 ============ -->
+  <section>
+    <h2 class="sec"><i></i>主奖池抽奖 <small>按公示概率加权随机</small></h2>
+    <div class="stage">
+      <div class="hint">单抽跑灯后弹出结果</div>
+      <div class="prize-grid" id="grid"></div>
+      <div class="ctl">
+        <button class="btn primary big" id="bLot1">🎯 抽 一 次</button>
+        <button class="btn primary big" id="bLot10">🚀 抽 十 次</button>
+        <button class="btn" id="bProb">概率公示</button>
+      </div>
+      <div class="note" style="margin-top:10px">每格一个奖项，金框＝稀有道具；为「有放回」独立事件，与官方一致。</div>
+    </div>
+  </section>
+
+  <!-- ============ RESULT MODAL ============ -->
+  <div class="overlay" id="ovl"><div class="modal">
+    <div class="mhead"><h3 id="mTitle">结果</h3><span class="x" id="mClose">×</span></div>
+    <div class="mbody" id="mBody"></div>
+    <div class="mfoot"><button class="btn primary mclose" id="mFootClose" type="button">关 闭</button></div>
+  </div></div>
+
+  <!-- ============ 概率公示 ============ -->
+  <section>
+    <h2 class="sec"><i></i>概率公示 <small>主奖池 16 项合计 100%</small></h2>
+    <div style="max-height:420px;overflow:auto">
+      <table id="probTab"><thead><tr><th>#</th><th>道具名称</th><th>稀有度</th><th class="num">概率</th><th class="num">累计</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <!-- ============ Monte Carlo ============ -->
+  <section>
+    <h2 class="sec"><i></i>分布测试 <small>Monte-Carlo 大样本验证抽奖权重</small></h2>
+    <div class="row" style="margin-bottom:12px">
+      <button class="btn" id="bSim1">1 万次</button>
+      <button class="btn" id="bSim10">10 万次</button>
+      <button class="btn" id="bSim100">100 万次</button>
+      <span class="note" style="margin-left:auto" id="simInfo"></span>
+    </div>
+    <div class="note" id="simStatus">尚未运行模拟。点击按钮对比「公示概率」与「实测占比」。</div>
+    <table class="hidden" id="simTab"><thead><tr><th>道具名称</th><th class="num">公示概率</th><th class="num">实测次数</th><th class="num">实测占比</th><th class="num">偏差</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <!-- ============ 抽奖记录 ============ -->
+  <section>
+    <h2 class="sec"><i></i>抽奖记录 <small id="histCount">0 条</small></h2>
+    <div class="scrollbox" id="histBox"><div class="note">暂无记录。</div></div>
+  </section>
+
+  <p class="footnote">说明：本页面为本地单文件离线模拟器，无任何网络请求。抽奖用区间累加加权随机（<code>drawOnce()</code>）；道具/概率数据来自下载框架 <code>抽奖_files/index.html</code>（主奖池 <code>popgl</code> 段）。钥匙价格、复活币赠钥匙规则取自页面「活动规则」原价。兑换区为<b>可编辑示例表</b>——官方兑换表由腾讯后台 <code>dhMap</code> 下发、未包含在本地文件内，请在「管理兑换项」中改为你的准确数值。背景素材：<code>assets/bg.jpg</code>。</p>
+</div>
+<div class="bgtoggle" id="bgToggle"><span class="dot"></span><span id="bgToggleLabel">背景动效：开</span></div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+/* ================= 主奖池数据 ================= */
+var RARE_ORDER={legend:0,epic:1,rare:2,common:3};
+var PRIZES=[
+  {name:"灯塔",                            prob:0.25,tier:"legend",joy:0},
+  {name:"斯泰尔-兔囡囡",                   prob:0.30,tier:"legend",joy:0},
+  {name:"飓风双雄",                        prob:0.50,tier:"legend",joy:0},
+  {name:"救赎猎手-天外旅者",               prob:0.60,tier:"legend",joy:0},
+  {name:"圣拳猎手-炽雪",                   prob:0.60,tier:"legend",joy:0},
+  {name:"钢铁终结者-残翼恶魔",             prob:0.60,tier:"legend",joy:0},
+  {name:"女皇终结者-堕落天使",             prob:0.70,tier:"legend",joy:0},
+  {name:"HK21-领域力场",                   prob:0.70,tier:"legend",joy:0},
+  {name:"迷你生化手雷-灵魂忍者",           prob:0.80,tier:"legend",joy:0},
+  {name:"[属性卡] 生化背包变更(生化模式)", prob:1.20,tier:"legend",joy:0},
+  {name:"生化补给自选",                    prob:5.25,tier:"epic",  joy:0},
+  {name:"欢乐值×25",                       prob:1.00,tier:"rare",  joy:25},
+  {name:"欢乐值×10",                       prob:2.50,tier:"rare",  joy:10},
+  {name:"欢乐值×8",                        prob:10.0,tier:"common",joy:8},
+  {name:"欢乐值×6",                        prob:35.0,tier:"common",joy:6},
+  {name:"欢乐值×5",                        prob:40.0,tier:"common",joy:5}
+];
+var TIER={legend:{label:"传说",tag:"传"},epic:{label:"史诗",tag:"史"},rare:{label:"稀有",tag:"稀"},common:{label:"普通",tag:"普"}};
+var CUM=[];(function(){var a=0;PRIZES.forEach(function(p){a+=p.prob;CUM.push(a);});})();
+/* 道具图片：popget1..16 顺序对应主奖池 PRIZES */
+PRIZES.forEach(function(p,i){p.img="assets/popget"+(i+1)+".png";});
+function imgByName(name){for(var i=0;i<PRIZES.length;i++)if(PRIZES[i].name===name)return PRIZES[i].img;return "";}
+
+/* ================= 商城 ================= */
+var PACKS=[
+  {qb:10, fhb:1,  key:1,  lab:"10 Q币"},
+  {qb:100,fhb:10, key:11, lab:"100 Q币"},
+  {qb:500,fhb:50, key:55, lab:"500 Q币"}
+];
+
+/* ================= 兑换示例表（可编辑） ================= */
+function defaultOffers(){return [
+  {name:"灯塔",cost:888},{name:"斯泰尔-兔囡囡",cost:558},{name:"飓风双雄",cost:348},
+  {name:"救赎猎手-天外旅者",cost:348},{name:"圣拳猎手-炽雪",cost:348},
+  {name:"钢铁终结者-残翼恶魔",cost:188},{name:"女皇终结者-堕落天使",cost:188},
+  {name:"HK21-领域力场",cost:128},{name:"迷你生化手雷-灵魂忍者",cost:58},
+  {name:"生化补给自选",cost:15},{name:"[属性卡] 生化背包变更(生化模式)",cost:15}
+];}
+
+/* ================= 抽奖核心 ================= */
+function pickIndex(){var r=Math.random()*100,i=0;for(;i<CUM.length;i++)if(r<CUM[i])return i;return CUM.length-1;}
+function drawOnce(){return PRIZES[pickIndex()];}
+
+/* ================= 状态 ================= */
+var state={qb:200,fhb:0,keys:10,joy:0,total:0,rare:0,counts:{},history:[],dhHist:[]};
+PRIZES.forEach(function(p){state.counts[p.name]=0;});
+var offers=defaultOffers();
+
+/* ================= DOM helpers ================= */
+var $=function(id){return document.getElementById(id);};
+function fmt(n){return n.toLocaleString('zh-CN');}
+function nowHM(){var d=new Date();function z(x){return (x<10?'0':'')+x;}return z(d.getHours())+":"+z(d.getMinutes())+":"+z(d.getSeconds());}
+
+/* ================= toast ================= */
+var toastT=null;
+function toast(msg,type){
+  var t=$("toast");t.textContent=msg;t.className=(type?"show "+type:"show");
+  if(toastT)clearTimeout(toastT);toastT=setTimeout(function(){t.className="";},2600);
+}
+
+/* ================= 渲染 ================= */
+function renderStats(){
+  $("stTotal").textContent=fmt(state.total);
+  $("stJoy").textContent=fmt(state.joy);
+  $("stQb").textContent=fmt(state.qb);
+  $("stFhb").textContent=fmt(state.fhb);
+  $("stKey").textContent=fmt(state.keys);
+  $("stRare").textContent=fmt(state.rare);
+  $("dhJoy").textContent=fmt(state.joy);
+  $("bLot1").disabled=(state.keys<1);
+  $("bLot10").disabled=(state.keys<10);
+  $("histCount").textContent=state.history.length+" 条";
+  $("dhHistCount").textContent=state.dhHist.length+" 条";
+}
+function buildGrid(){
+  var g=$("grid");g.innerHTML="";
+  PRIZES.forEach(function(p){
+    var c=document.createElement("div");c.className="cell"+(p.tier!=="common"?" rar":"");
+    c.id="cell_"+encodeURIComponent(p.name);
+    c.innerHTML='<div class="tag">'+TIER[p.tier].tag+'</div>'
+      +'<div class="ph"><img src="'+p.img+'" alt="'+p.name+'"></div>'
+      +'<div class="rname tier-'+p.tier+'">'+p.name+'</div><div class="pp">'+p.prob+'%</div>';
+    g.appendChild(c);
+  });
+}
+function buildPacks(){
+  var box=$("packs");box.innerHTML="";
+  PACKS.forEach(function(p){
+    var d=document.createElement("div");d.className="pack";
+    var per=(p.qb/p.key).toFixed(1);
+    d.innerHTML='<div class="pr">'+p.qb+'<small> Q币</small></div>'
+      +'<div class="gd">复活币 <b>+'+p.fhb+'</b><br>抽奖钥匙 <b style="color:var(--gold)">+'+p.key+'</b>（'+per+' Q币/把）</div>';
+    var b=document.createElement("button");b.className="btn primary";b.textContent="购买";
+    b.onclick=function(){buyPack(p);};d.appendChild(b);box.appendChild(d);
+  });
+}
+function buildProbTable(){
+  var tb=$("probTab").querySelector("tbody");tb.innerHTML="";var acc=0;
+  PRIZES.forEach(function(p,i){acc+=p.prob;
+    var tr=document.createElement("tr");
+    tr.innerHTML='<td>'+(i+1)+'</td><td style="padding:4px 8px"><span class="probm"><img src="'+p.img+'" alt=""></span><span class="tier-'+p.tier+'" style="font-weight:600">'+p.name+'</span></td>'
+      +'<td style="color:var(--muted)">'+TIER[p.tier].label+'</td>'
+      +'<td class="num">'+p.prob+'%</td><td class="num" style="color:var(--muted)">'+acc.toFixed(2)+'%</td>';
+    tb.appendChild(tr);
+  });
+}
+
+/* ================= 兑换渲染/逻辑 ================= */
+function renderOffers(){
+  var box=$("dhList");box.innerHTML="";
+  var managing=!$("manageRow").classList.contains("hidden");
+  $("dhEmpty").classList.toggle("hidden",offers.length>0);
+  offers.forEach(function(o,idx){
+    var cost=+o.cost||0,afford=state.joy>=cost;
+    var cell=document.createElement("div");cell.className="dh-cell";
+    var im=imgByName(o.name);
+    cell.innerHTML=(im?'<div class="dh-pic"><img src="'+im+'" alt=""></div>':'')
+      +'<div class="dh-name">'+o.name+'</div>'
+      +'<div class="dh-cost">消耗欢乐值 <b>'+fmt(cost)+'</b></div>';
+    var wrap=document.createElement("div");wrap.style.display="flex";wrap.style.gap="8px";
+    var b=document.createElement("button");
+    b.className="btn primary mini"+(afford?"":" ghost");
+    b.textContent=afford?"兑换":"欢乐值不足";b.disabled=!afford;
+    b.onclick=function(){redeem(idx);};
+    wrap.appendChild(b);
+    if(managing){
+      var del=document.createElement("button");del.className="btn red mini";del.textContent="删除";
+      del.onclick=function(){offers.splice(idx,1);renderOffers();};
+      wrap.appendChild(del);
+    }
+    cell.appendChild(wrap);box.appendChild(cell);
+  });
+}
+function redeem(idx){
+  var o=offers[idx];if(!o)return;var cost=+o.cost||0;
+  if(state.joy<cost){toast("欢乐值不足：需要 "+cost+"，当前 "+state.joy,"err");return;}
+  state.joy-=cost;
+  state.dhHist.unshift({t:nowHM(),name:o.name,cost:cost});
+  renderStats();renderOffers();renderDhHist();
+  toast("兑换成功：欢乐值×"+cost+" → 【"+o.name+"】已发放","ok");
+}
+function renderDhHist(){
+  var box=$("dhHistBox");box.innerHTML="";
+  if(!state.dhHist.length){box.innerHTML='<div class="note">兑换成功后会记录在这里。</div>';return;}
+  state.dhHist.slice(0,60).forEach(function(h){
+    var li=document.createElement("div");li.className="li";
+    li.innerHTML='<span class="tm">'+h.t+'</span><span style="color:#dfe7f5">兑换【'+h.name+'】</span>'
+      +'<span style="color:var(--gold);white-space:nowrap">-'+fmt(h.cost)+' 欢乐值</span>';
+    box.appendChild(li);
+  });
+}
+
+/* ================= 抽奖 ================= */
+function settle(arr){
+  var jg=0;
+  arr.forEach(function(p){state.counts[p.name]++;jg+=p.joy;if(p.tier==="legend"||p.tier==="epic")state.rare++;});
+  state.total+=arr.length;state.joy+=jg;
+  var t=nowHM();arr.forEach(function(p){state.history.push({t:t,name:p.name});});
+  pushHist();renderStats();
+}
+function rarestOf(arr){return arr.reduce(function(b,p){return RARE_ORDER[p.tier]<RARE_ORDER[b.tier]?p:b;},arr[0]);}
+var rollTimer=null;
+function stopRoll(){if(rollTimer){clearInterval(rollTimer);rollTimer=null;}}
+function glowCell(idx){
+  stopRoll();
+  var prev=document.querySelector("#grid .glow");if(prev)prev.classList.remove("glow");
+  var c=document.getElementById("cell_"+encodeURIComponent(PRIZES[idx].name));if(c)c.classList.add("glow");
+}
+function rollTo(finalIdx){
+  stopRoll();var n=PRIZES.length,t=0;
+  rollTimer=setInterval(function(){glowCell(Math.floor(Math.random()*n));t+=70;
+    if(t>=900){clearInterval(rollTimer);rollTimer=null;glowCell(finalIdx);}},70);
+}
+function doLot(n){
+  if(state.keys<n){toast("钥匙不足：需 "+n+" 把钥匙，当前 "+state.keys,"err");return;}
+  state.keys-=n;
+  var arr=[],i;for(i=0;i<n;i++)arr.push(drawOnce());
+  settle(arr);
+  if(n===1){var w=rarestOf(arr),ix=PRIZES.indexOf(w);rollTo(ix);
+    setTimeout(function(){glowCell(ix);showResult(arr);},960);}
+  else showResult(arr);
+}
+
+/* ================= 弹窗 ================= */
+function showResult(arr){
+  var b=$("mBody");
+  if(arr.length===1){
+    var p=arr[0],rare=p.tier==="legend"||p.tier==="epic";
+    b.innerHTML='<span class="result-badge '+(rare?"t":"")+'">'+TIER[p.tier].label+' · 概率 '+p.prob+'%</span>'
+      +'<div class="result-img"><img src="'+p.img+'" alt="'+p.name+'"></div>'
+      +'<div class="result-name tier-'+p.tier+'">'+(rare?"✨ ":"")+p.name+(rare?" ✨":"")+'</div>'
+      +(p.joy?('<div class="result-p" style="color:#9ff1c8;font-weight:700;font-size:18px">+'+p.joy+' 欢乐值</div>')
+            :'<div class="result-p">道具 · 已放入模拟仓库</div>')
+      +(rare?'<div class="confetti">★ ★ ★ ★ ★</div>':'');
+  }else{
+    var sorted=arr.slice().sort(function(a,c){return RARE_ORDER[a.tier]-RARE_ORDER[c.tier];});
+    var h='<div class="tenlist">';
+    sorted.forEach(function(p){h+='<div class="tenrow">'
+      +'<img class="timg" src="'+p.img+'" alt=""><span class="nm tier-'+p.tier+'">'
+      +(p.joy?("🎉 "+p.name+' <span class="nms">+'+p.joy+'欢乐值</span>'):p.name)+'</span>'
+      +'<span class="nms" style="color:var(--muted)">'+TIER[p.tier].label+'</span></div>';});
+    h+='</div><div class="note" style="margin-top:12px">共 <b style="color:#9ff1c8">+'
+      +arr.reduce(function(s,p){return s+p.joy;},0)+' 欢乐值</b>，'
+      +arr.filter(function(p){return p.tier==="legend"||p.tier==="epic";}).length+' 件稀有道具。</div>';
+    b.innerHTML=h;
+  }
+  $("mTitle").textContent=arr.length===1?"抽奖结果":"十连 · "+arr.length+" 抽";
+  $("ovl").classList.add("open");
+}
+function showProb(){
+  var b=$("mBody");$("mTitle").textContent="概率公示 · 主奖池（16 项合计 100%）";
+  var rows="";PRIZES.forEach(function(p){rows+='<tr><td><span class="probm"><img src="'+p.img+'" alt=""></span><span class="tier-'+p.tier+'" style="font-weight:600">'+p.name+'</span></td><td class="num">'+p.prob+'%</td></tr>';});
+  b.innerHTML='<div style="max-height:340px;overflow:auto;text-align:left">'
+    +'<table><thead><tr><th>道具名称</th><th class="num">概率</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'<div class="note" style="margin-top:10px;text-align:left">同一奖品可重复抽到；唯一性道具仓库内不可重复获得（模拟器仅统计）。</div>';
+  $("ovl").classList.add("open");
+}
+
+/* ================= 记录 ================= */
+function pushHist(){
+  var box=$("histBox");box.innerHTML="";
+  if(!state.history.length){box.innerHTML='<div class="note">暂无记录。</div>';return;}
+  state.history.slice(-60).reverse().forEach(function(h){
+    var p=null;for(var i=0;i<PRIZES.length;i++)if(PRIZES[i].name===h.name){p=PRIZES[i];break;}
+    var li=document.createElement("div");li.className="li";
+    li.innerHTML='<span class="tm">'+h.t+'</span><span class="nm tier-'+(p?p.tier:"common")+'">'+h.name+'</span>';
+    box.appendChild(li);
+  });
+}
+
+/* ================= 商城 ================= */
+function buyPack(p){
+  if(state.qb<p.qb){toast("Q币不足：需 "+p.qb+"，当前 "+state.qb+"。可点「模拟充值」","err");return;}
+  state.qb-=p.qb;state.fhb+=p.fhb;state.keys+=p.key;
+  renderStats();
+  toast("购买成功：复活币+"+p.fhb+"，钥匙+"+p.key+"（-"+p.qb+" Q币）","ok");
+}
+
+/* ================= Monte-Carlo ================= */
+function simRun(N){
+  var c={},i;PRIZES.forEach(function(p){c[p.name]=0;});
+  for(i=0;i<N;i++)c[PRIZES[pickIndex()].name]++;
+  var tb=$("simTab").querySelector("tbody");tb.innerHTML="";
+  PRIZES.forEach(function(p){
+    var obs=c[p.name]/N*100,delta=obs-p.prob;
+    var cls=Math.abs(delta)<0.05*Math.max(0.01,p.prob)?"eq":(delta>0?"ok":"bad");
+    var color=p.tier==="legend"?"#ff9f1c":p.tier==="epic"?"#b06bff":(p.tier==="rare"?"#59b9ff":"#44506e");
+    var w=Math.max(1,obs*0.8);
+    var tr=document.createElement("tr");
+    tr.innerHTML='<td><span class="probm"><img src="'+p.img+'" alt=""></span><span class="tier-'+p.tier+'" style="font-weight:600">'+p.name+'</span></td>'
+      +'<td class="num">'+p.prob+'%</td><td class="num">'+fmt(c[p.name])+'</td>'
+      +'<td class="num">'+obs.toFixed(4)+'%<span class="bar" style="width:'+Math.min(120,w)+'px;background:linear-gradient(90deg,'+color+',transparent)"></span></td>'
+      +'<td class="num '+cls+'">'+(delta>0?"+":"")+delta.toFixed(4)+'%</td>';
+    tb.appendChild(tr);
+  });
+  $("simTab").classList.remove("hidden");$("simStatus").classList.add("hidden");
+  $("simInfo").textContent="样本量 "+fmt(N)+"，偏差＝实测 − 公示。";
+}
+
+/* ================= events ================= */
+/* ================= 背景动效：漂浮火星 + 开关 ================= */
+function spawnSparks(){
+  var fx=$("bgfx");if(!fx)return;
+  var n=18;
+  for(var i=0;i<n;i++){
+    var s=document.createElement("span");s.className="spark";
+    var size=(2+Math.random()*3).toFixed(1);
+    var dur=(9+Math.random()*16).toFixed(1);
+    var delay=(-Math.random()*dur).toFixed(1);
+    s.style.left=(2+Math.random()*96)+"%";
+    s.style.width=size+"px";s.style.height=size+"px";
+    s.style.animationDuration=dur+"s";s.style.animationDelay=delay+"s";
+    fx.appendChild(s);
+  }
+}
+function setBgOn(on){
+  document.body.classList.toggle("bg-static",!on);
+  var t=$("bgToggle");
+  if(on){t.classList.remove("off");$("bgToggleLabel").textContent="背景动效：开";}
+  else{t.classList.add("off");$("bgToggleLabel").textContent="背景动效：关";}
+}
+document.addEventListener("DOMContentLoaded",function(){
+  buildGrid();buildPacks();buildProbTable();renderStats();renderOffers();renderDhHist();pushHist();
+  spawnSparks();
+});
+$("bgToggle").addEventListener("click",function(){
+  setBgOn(document.body.classList.contains("bg-static"));
+});
+$("bLot1").addEventListener("click",function(){doLot(1);});
+$("bLot10").addEventListener("click",function(){doLot(10);});
+$("bProb").addEventListener("click",showProb);
+$("bRecharge").addEventListener("click",function(){state.qb+=100;renderStats();toast("模拟充值 +100 Q币","ok");});
+$("bReset").addEventListener("click",function(){
+  state={qb:200,fhb:0,keys:10,joy:0,total:0,rare:0,counts:{},history:[],dhHist:[]};
+  PRIZES.forEach(function(p){state.counts[p.name]=0;});
+  offers=defaultOffers();stopRoll();
+  renderStats();renderOffers();renderDhHist();pushHist();
+  toast("已重置：Q币 200 / 钥匙 10 / 欢乐值 0","ok");
+});
+$("bManage").addEventListener("click",function(){
+  var r=$("manageRow");r.classList.toggle("hidden");
+  this.textContent=r.classList.contains("hidden")?"＋ 管理兑换项":"收起管理";
+  renderOffers();
+});
+$("bAddOffer").addEventListener("click",function(){
+  var nm=$("inName").value.trim(),cost=parseInt($("inCost").value,10);
+  if(!nm){toast("请填写道具名称","err");return;}
+  if(!cost||cost<1){toast("欢乐值需为正整数","err");return;}
+  if(offers.some(function(o){return o.name===nm;})){toast("已存在同名兑换项【"+nm+"】","err");return;}
+  offers.push({name:nm,cost:cost});
+  $("inName").value="";$("inCost").value="";
+  renderOffers();
+  toast("已添加兑换项【"+nm+"】需欢乐值×"+cost,"ok");
+});
+$("mClose").addEventListener("click",function(){$("ovl").classList.remove("open");stopRoll();});
+$("mFootClose").addEventListener("click",function(){$("ovl").classList.remove("open");stopRoll();});
+$("ovl").addEventListener("click",function(e){if(e.target===this){this.classList.remove("open");stopRoll();}});
+$("bSim1").addEventListener("click",function(){simRun(10000);});
+$("bSim10").addEventListener("click",function(){simRun(100000);});
+$("bSim100").addEventListener("click",function(){simRun(1000000);});
+</script>
+</body>
+</html>
